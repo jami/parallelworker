@@ -90,13 +90,22 @@ func runWorker(id int, jobs <-chan string, log chan logOutput, execCmd []string,
 
 	for job := range jobs {
 		var stderr, stdout bytes.Buffer
+		var cmdExec *exec.Cmd
+
+		execTmp := make([]string, len(execCmd))
 		t0 := time.Now()
 
-		prog := execCmd[0]
-		args := strings.Join(execCmd[1:], " ")
-		args = strings.Replace(args, "%arg", job, -1)
+		for i := 0; i < len(execCmd); i++ {
+			execTmp[i] = strings.Replace(execCmd[i], "%arg", job, -1)
+		}
 
-		cmdExec := exec.Command(prog, args)
+		prog := execTmp[0]
+		if len(execTmp) > 1 {
+			cmdExec = exec.Command(prog, execTmp[1:]...)
+		} else {
+			cmdExec = exec.Command(prog)
+		}
+
 		cmdExec.Env = os.Environ()
 		cmdExec.Stderr = &stderr
 		cmdExec.Stdout = &stdout
@@ -116,7 +125,7 @@ func runWorker(id int, jobs <-chan string, log chan logOutput, execCmd []string,
 		log <- logOutput{
 			id:       id,
 			start:    t0,
-			cmd:      prog + " " + args,
+			cmd:      strings.Join(execTmp, " "),
 			err:      errStr,
 			exit:     exitCode,
 			duration: t1.Sub(t0),
